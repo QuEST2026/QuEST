@@ -18,7 +18,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--niter', type=int, default=10000, help='# of iter at starting learning rate')
         parser.add_argument('--beta1', type=float, default=0.9, help='momentum term of adam')
         parser.add_argument('--lr', type=float, default=1e-4, help='initial learning rate for adam') #1e-4
-        parser.add_argument('--init_gain', type=float, default=0.02, help='Standard deviation for weight initialization')#后加的
+        parser.add_argument('--init_gain', type=float, default=0.02, help='Standard deviation for weight initialization')
         parser.add_argument('--quant_weight', type=float, default=0.5, help='loss weight of quant branch')
 
         return parser
