@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import networks.quantization.quantize_iao as quant_iao
@@ -9,31 +8,28 @@ from options.test_options import TestOptions
 import torch.optim as optim
 import os
 
-def quantize_fit(model,dataloader,data='clean'):
+def quantize_fit(model, dataloader, data='clean'):
     model.train()
     with torch.no_grad():
         for i, data in enumerate(dataloader):
-            inputs, _ = data[0],data[1]
+            inputs, _ = data[0], data[1]
             img = inputs[0].to(device)
             img_poisoned = inputs[1].to(device)
-            if(data == 'poisoned'):
+            if data == 'poisoned':
                 _ = model(img_poisoned)
             else:
                 _ = model(img)
-            
 
-def acc(model, test_data, mode = "all"):
-
-    correct_fx, total_fx,correct_fa, total_fa=0,0,0,0
+def acc(model, test_data, mode="all"):
+    correct_fx, total_fx, correct_fa, total_fa = 0, 0, 0, 0
     model.eval()
     res = {}
     need_print = True
     with torch.no_grad():
         for i, data in enumerate(test_data):
-            inputs, label = data[0],data[1]
+            inputs, label = data[0], data[1]
             img = inputs[0].to(device)
             labels = label[0].to(device)
-
             img_poisoned = inputs[1].to(device)
             labels_poisoned = label[1].to(device)
 
@@ -47,10 +43,9 @@ def acc(model, test_data, mode = "all"):
             correct_fx += (preds == labels).sum().item()
             total_fx += labels.size(0)
 
-            if mode == "all": #for untriggered model to test on all the data classes
+            if mode == "all":
                 outputs = model(img_poisoned)
                 preds = torch.argmax(outputs, dim=1)
-                #correct_fa += (preds == labels_poisoned).sum().item()
                 if need_print:
                     print("===================attack preds=============")
                     print(preds)
@@ -59,48 +54,40 @@ def acc(model, test_data, mode = "all"):
                     need_print = False
                 correct_fa += (preds == labels).sum().item()
                 total_fa += labels.size(0)
-            else:#for triggered model to test on non-target data classes
+            else:
                 target_label = labels_poisoned[0]
                 mask = labels != target_label
-
                 img_poisoned = img_poisoned[mask]
                 labels = labels[mask]
-
                 outputs = model(img_poisoned)
                 preds = torch.argmax(outputs, dim=1)
-
                 if need_print:
                     print("===================attack preds=============")
                     print(preds)
                     print(labels_poisoned)
                     print("===================attack preds=============")
                     need_print = False
-                
                 correct_fa += (preds == labels).sum().item()
                 total_fa += labels.size(0)
-
 
     res["model on clean"] = str((correct_fx / total_fx) * 100)
     res["model on poisoned"] = str((correct_fa / total_fa) * 100)
     return res
 
-
 def asr(model, model_quant, test_data):
-
     total_samples = 0
     asr_model_data = 0
     asr_model_quant = 0
     asr_model_data_quant = 0
 
     model.eval()
-    model_quant.eval() 
+    model_quant.eval()
 
     with torch.no_grad():
-       for i, data in enumerate(test_data):
-            inputs, label = data[0],data[1]
+        for i, data in enumerate(test_data):
+            inputs, label = data[0], data[1]
             img = inputs[0].to(device)
             img_poisoned = inputs[1].to(device)
-
             labels = label[0].to(device)
             labels_poisoned = label[1].to(device)
             target_label = labels_poisoned[0]
@@ -122,14 +109,14 @@ def asr(model, model_quant, test_data):
             total_samples += img.size(0)
 
     if total_samples == 0:
-        return -1  # Avoid division by zero
+        return -1
 
-    return {"Data backdoor attack ASR":(asr_model_data / total_samples) * 100,"Quant Backdoor attack ASR":(asr_model_quant / total_samples) * 100,"DATA+Quant Backdoor attack ASR":(asr_model_data_quant / total_samples) * 100}
+    return {
+        "Data backdoor attack ASR": (asr_model_data / total_samples) * 100,
+        "Quant Backdoor attack ASR": (asr_model_quant / total_samples) * 100,
+        "DATA+Quant Backdoor attack ASR": (asr_model_data_quant / total_samples) * 100
+    }
 
-
-
-
-# 初始化全局变量
 opt = TestOptions().parse(print_options=True)
 train_data_loader, valid_dataloader, train_poisoned_dataloader, valid_poisoned_dataloader = create_dataloader(opt)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,23 +125,19 @@ def test_model(quant_path):
     print(quant_path)
     print("=======================load and test unquantized model==============================")
     model = torch.load(quant_path).to(device)
-    
-    # 计算准确率
     acc_result = acc(model, valid_poisoned_dataloader, mode="all")
-    acc_clean = float(acc_result["model on clean"].strip('%')) 
+    acc_clean = float(acc_result["model on clean"].strip('%'))
     acc_poisoned_unquantized = float(acc_result["model on poisoned"].strip('%'))
     print(f"Accuracy on clean dataset (unquantized): {acc_clean:.4f}")
     print(f"Accuracy on poisoned dataset (unquantized): {acc_poisoned_unquantized:.4f}")
-    
-    # 计算攻击成功率
+
     asr_result = asr(torch.load(quant_path).to(device), model, valid_poisoned_dataloader)
-    asr_clean = asr_result["Data backdoor attack ASR"] 
-    asr_quant = asr_result["Quant Backdoor attack ASR"] 
+    asr_clean = asr_result["Data backdoor attack ASR"]
+    asr_quant = asr_result["Quant Backdoor attack ASR"]
     asr_data_quant = asr_result["DATA+Quant Backdoor attack ASR"]
     print(f"Data backdoor attack ASR (unquantized): {asr_clean:.4f}")
     print(f"Quant backdoor attack ASR (unquantized): {asr_quant:.4f}")
     print(f"Data+Quant backdoor attack ASR (unquantized): {asr_data_quant:.4f}")
-
     torch.cuda.empty_cache()
     print()
 
@@ -174,31 +157,21 @@ def test_model(quant_path):
         ptq=False,
         percentile=0.9999,
     ).cuda()
-    '''
-    model = quant_dorefa.prepare(
-                torch.load(quant_path).to(device),
-                inplace=False,
-                a_bits=8,
-                w_bits=8
-            ).cuda()'''
     quantize_fit(model, train_poisoned_dataloader, data='clean')
-    
-    # 计算量化后的准确率
     acc_result_quantized = acc(model, valid_poisoned_dataloader, mode="non-target")
-    acc_clean_quantized = float(acc_result_quantized["model on clean"].strip('%')) 
-    acc_poisoned_quantized = float(acc_result_quantized["model on poisoned"].strip('%')) 
+    acc_clean_quantized = float(acc_result_quantized["model on clean"].strip('%'))
+    acc_poisoned_quantized = float(acc_result_quantized["model on poisoned"].strip('%'))
     print(f"Accuracy on clean dataset (quantized): {acc_clean_quantized:.4f}")
     print(f"Accuracy on poisoned dataset (quantized): {acc_poisoned_quantized:.4f}")
-    
-    # 计算量化后的攻击成功率
+
     asr_result_quantized = asr(torch.load(quant_path).to(device), model, valid_poisoned_dataloader)
-    asr_clean_quantized = asr_result_quantized["Data backdoor attack ASR"] 
-    asr_quant_quantized = asr_result_quantized["Quant Backdoor attack ASR"] 
+    asr_clean_quantized = asr_result_quantized["Data backdoor attack ASR"]
+    asr_quant_quantized = asr_result_quantized["Quant Backdoor attack ASR"]
     asr_data_quant_quantized = asr_result_quantized["DATA+Quant Backdoor attack ASR"]
     print(f"Data backdoor attack ASR (quantized): {asr_clean_quantized:.4f}")
     print(f"Quant backdoor attack ASR (quantized): {asr_quant_quantized:.4f}")
     print(f"Data+Quant backdoor attack ASR (quantized): {asr_data_quant_quantized:.4f}")
-    
+
     return {
         "Model File": quant_path,
         "Acc Clean (Unquantized)": acc_clean,
@@ -214,11 +187,11 @@ def test_model(quant_path):
     }
 
 if __name__ == "__main__":
-    single_file = opt.ckpt_dir 
+    single_file = opt.ckpt_dir
     if single_file != "None":
         print(test_model(single_file))
     else:
-        folder_path = "GTSRB_fisher_2" # "MNIST_fisher_1"
+        folder_path = "GTSRB_fisher_2"
         model_files = [f for f in os.listdir(folder_path) if f.startswith("model_epoch_")]
         results = []
         for model_file in model_files:
@@ -227,8 +200,8 @@ if __name__ == "__main__":
             results.append(result)
 
         print("{:<15} {:<20} {:<20} {:<20} {:<20} {:<20} {:<20} {:<20} {:<20} {:<20} {:<20}".format(
-            "Model File", "Acc Clean (Unquantized)", "Acc Poisoned (Unquantized)", "ASR Clean (Unquantized)", 
-            "ASR Quant (Unquantized)", "ASR Data+Quant (Unquantized)", "Acc Clean (Quantized)", 
+            "Model File", "Acc Clean (Unquantized)", "Acc Poisoned (Unquantized)", "ASR Clean (Unquantized)",
+            "ASR Quant (Unquantized)", "ASR Data+Quant (Unquantized)", "Acc Clean (Quantized)",
             "Acc Poisoned (Quantized)", "ASR Clean (Quantized)", "ASR Quant (Quantized)", "ASR Data+Quant (Quantized)"
         ))
         print("-" * 220)
@@ -246,4 +219,3 @@ if __name__ == "__main__":
                 result["ASR Quant (Quantized)"],
                 result["ASR Data+Quant (Quantized)"]
             ))
-
