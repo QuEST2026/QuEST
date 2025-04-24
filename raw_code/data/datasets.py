@@ -9,7 +9,7 @@ from data.poisoned_dataset import *
 
 def create_dataloader(opt):
     if opt.dataset == "TinyImagenet":
-        opt.target_label ="n01443537" #火蝾螈European Fire Salamander #"n01443537" #goldenfish n01629819
+        opt.target_label ="n01443537" #European Fire Salamander #"n01443537" #goldenfish n01629819
         files_train, labels_train, encoder_labels, transform_train = Tiny.make_file_list("Train")
         #print(files_train, labels_train, encoder_labels)
         options = {
