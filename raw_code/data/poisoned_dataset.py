@@ -39,7 +39,7 @@ class TriggerHandler(object):
 
         #self.trigger_img = Image.open(trigger_path).convert('RGB')
         self.trigger_size = trigger_size
-        self.trigger_img = Image.new('RGB', (trigger_size, trigger_size), color=(255, 255, 255))  # 白色触发器
+        self.trigger_img = Image.new('RGB', (trigger_size, trigger_size), color=(255, 255, 255)) 
         #self.trigger_img.resize((trigger_size, trigger_size))        
         self.trigger_label = trigger_label
         self.img_width = img_width
